@@ -115,8 +115,7 @@ bool get_permissive_hold(uint16_t keycode, keyrecord_t *record) {
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     if ((!IS_UNILATERAL_INPUT(*record, inter_record, 0x02)
          && IS_QK_MOD_TAP(keycode)
-         && (inter_keycode & 0xFF) <= KC_Z)
-        || (keycode == RCTL_T(KC_9) && inter_keycode == RALT_T(KC_0))) {
+         && (inter_keycode & 0xFF) <= KC_Z)) {
         tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
         pressed_keys[tap.index] |= tap.bitmask;
         record->tap.interrupted = false;
@@ -124,39 +123,6 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
         return true;
     }
     return false;
-}
-
-typedef struct {
-    uint16_t keycode;
-    bool     pended;
-} mt_t;
-
-mt_t mts[] = {
-    { LGUI_T(KC_N)    },
-    { LALT_T(KC_R)    },
-    { LSFT_T(KC_T)    },
-    { LCTL_T(KC_S)    },
-    { RCTL_T(KC_E)    },
-    { RSFT_T(KC_A)    },
-    { RALT_T(KC_I)    },
-    { RGUI_T(KC_QUOT) },
-    { RCTL_T(KC_9)    },
-    { RSFT_T(KC_QUOT) },
-    { RALT_T(KC_0)    },
-    { RGUI_T(KC_3)    },
-};
-
-void mts_mods_on(void) {
-    uint8_t pending_mods = 0;
-    for (uint8_t i = 0; i < ARRAY_SIZE(mts); i++) {
-        mt_t *mt = &mts[i];
-        if (mt->pended) {
-            uint8_t mod = (mt->keycode >> 8) & 0x1F;
-            pending_mods |= (mod & 0x10) ? (mod << 4) : mod;
-            mt->pended = false;
-        }
-    }
-    register_mods(pending_mods);
 }
 
 void send_report_user(uint16_t keycode) {
@@ -195,8 +161,7 @@ void tap_code_attached(uint16_t keycode) {
 }
 
 enum my_keycodes {
-    MY_INT4 = SAFE_RANGE,
-    MY_OS_CTL,
+    MY_OS_CTL = SAFE_RANGE,
     MY_OS_SFT,
     MY_OS_ALT,
 };
@@ -221,7 +186,7 @@ void four_moves(uint16_t keycode) {
     }
 }
 
-#define BUFFER_SIZE 32
+#define BUFFER_SIZE 16
 
 typedef struct {
     uint16_t buffer[BUFFER_SIZE];
@@ -250,31 +215,30 @@ bool dequeue(mt_cycle_t *buf, uint16_t *data) {
     return true;
 }
 
-void clear_queue(mt_cycle_t *buf) {
-    buf->front = buf->rear = buf->count = 0;
-}
-
 mt_cycle_t lmts = {{0}, 0, 0, 0};
 mt_cycle_t rmts = {{0}, 0, 0, 0};
 
-void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
-    if (!IS_HOMEROW(keycode, record, MOD_HYPR)) {
-        mts_mods_on();
-        clear_queue(&lmts);
-        clear_queue(&rmts);
-        return;
-    }
-    mt_cycle_t *same  = record.event.key.row == 1 ? &lmts : &rmts;
-    mt_cycle_t *other = record.event.key.row == 5 ? &lmts : &rmts;
+void mts_hold_on(mt_cycle_t *mts) {
     uint16_t poped_key;
     uint8_t  pended_mods = 0;
-
-    while (dequeue(other, &poped_key)) {
-        uint8_t mod = (poped_key >> 8) & 0x1F;
+    while (dequeue(mts, &poped_key)) {
+        uint8_t mod  = (poped_key >> 8) & 0x1F;
         pended_mods |= (mod & 0x10) ? (mod << 4) : mod;
     }
     register_mods(pended_mods);
+}
 
+void mts_hold_on_all(void) {
+     mts_hold_on(&lmts);
+     mts_hold_on(&rmts);
+}
+
+void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
+    mt_cycle_t *same  = record.event.key.row == 1 ? &lmts : &rmts;
+    mt_cycle_t *other = record.event.key.row == 5 ? &lmts : &rmts;
+    uint16_t poped_key;
+
+    mts_hold_on(other);
     while (dequeue(same, &poped_key)) {
         tap_code_attached(poped_key);
         if (keycode == poped_key) {
@@ -284,60 +248,54 @@ void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    for (uint8_t i = 0; i < ARRAY_SIZE(mts); i++) {
-        mt_t *mt = &mts[i];
-        if (keycode == mt->keycode) {
-            if (IS_LAYER_ON(2)) {
-                uint8_t saved_mods = get_mods();
-                caps_word_on();
-                set_mods(saved_mods);
-            }
-            if (record->event.pressed) {
-                if (record->tap.count) {
-                    procoss_pended_keys(keycode, *record);
-                } else {
-                    mt->pended = true;
-                    enqueue(record->event.key.row == 1 ? &lmts : &rmts, keycode);
-                    return false;
-                }
-            } else {
-                if (mt->pended) {
-                    mt->pended = false;
-                    uint8_t mod = (keycode >> 8) & 0x1F;
-                    unregister_mods((mod & 0x10) ? (mod << 4) : mod);
-                    procoss_pended_keys(keycode, *record);
-                    return false;
-                }
-            }
-            return true;
+    if (IS_QK_MOD_TAP(keycode)) {
+        if (IS_LAYER_ON(2)) {
+            uint8_t saved_mods = get_mods();
+            caps_word_on();
+            set_mods(saved_mods);
         }
+        if (record->event.pressed) {
+            if (record->tap.count) {
+                procoss_pended_keys(keycode, *record);
+            } else {
+                enqueue(record->event.key.row == 1 ? &lmts : &rmts, keycode);
+                return false;
+            }
+        } else if (!record->tap.count) {
+            uint8_t mod = (keycode >> 8) & 0x1F;
+            unregister_mods((mod & 0x10) ? (mod << 4) : mod);
+            procoss_pended_keys(keycode, *record);
+            return false;
+        }
+        return true;
     }
 
     switch (keycode) {
         case KC_MS_BTN1 ... KC_MS_BTN3:
-            if (record->event.pressed) {
-                for (uint8_t i = 0; i < ARRAY_SIZE(mts); i++) {
-                    if (mts[i].pended) {
-                        mts_mods_on();
-                        report_mouse_t mouse_report = pointing_device_get_report();
-                        mouse_report.buttons |= MOUSE_BTN1 << (keycode - KC_MS_BTN1);
-                        pointing_device_set_report(mouse_report);
-                        return false;
-                    }
-                }
-                return true;
+            if (record->event.pressed
+                && (lmts.count || rmts.count)) {
+                mts_hold_on_all();
+                report_mouse_t mouse_report = pointing_device_get_report();
+                mouse_report.buttons |= MOUSE_BTN1 << (keycode - KC_MS_BTN1);
+                pointing_device_set_report(mouse_report);
+                return false;
             }
+            return true;
     }
 
-    procoss_pended_keys(keycode, *record);
+    mts_hold_on_all();
 
     switch (keycode) {
-        case MY_INT4:
-            if (record->event.pressed) {
-                add_weak_mods(MOD_LGUI);
-                register_code(KC_SLSH);
-            } else {
-                unregister_code(KC_SLSH);
+        case LT(0, KC_INT4):
+            if (record->tap.count) {
+                if (record->event.pressed) {
+                    add_weak_mods(MOD_LGUI);
+                    register_code(KC_SLSH);
+                } else {
+                    unregister_code(KC_SLSH);
+                }
+            } else if (record->event.pressed) {
+                set_oneshot_layer(3, ONESHOT_START);
             }
             return false;
         case MY_OS_CTL ... MY_OS_ALT:
@@ -563,6 +521,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             caps_word_off();
             break;
     }
+    if (!record->event.pressed) {
+        clear_oneshot_layer_state(ONESHOT_PRESSED);
+    }
     return true;
 }
 
@@ -622,7 +583,7 @@ const uint16_t PROGMEM cmb_ms_btn3[]   = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END}
 combo_t key_combos[] = {
     [CMB_APP]        = COMBO(cmb_app,       KC_APP),
     [CMB_PSCR]       = COMBO(cmb_pscr,      KC_PSCR),
-    [CMB_INT4]       = COMBO(cmb_int4,      MY_INT4),
+    [CMB_INT4]       = COMBO(cmb_int4,      LT(0, KC_INT4)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
     [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    MY_OS_CTL),
@@ -667,7 +628,7 @@ uint8_t combo_ref_from_layer(uint8_t layer) {
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     clear_weak_mods();
     if (abs(mouse_report.x) + abs(mouse_report.y)) {
-        mts_mods_on();
+        mts_hold_on_all();
     }
     return mouse_report;
 }
