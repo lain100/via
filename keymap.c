@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdint.h>
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
@@ -240,10 +241,10 @@ void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
     uint16_t poped_key;
 
     mts_hold_on(other);
-    if (is_caps_word_on()) {
-        add_weak_mods(MOD_LSFT);
-    }
     while (dequeue(same, &poped_key)) {
+        if (is_caps_word_on()) {
+            add_weak_mods(MOD_LSFT);
+        }
         tap_code(QK_MOD_TAP_GET_TAP_KEYCODE(poped_key));
         send_report_user(poped_key);
         if (keycode == poped_key) {
@@ -323,6 +324,17 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     keycode == MY_OS_CTL ? MOD_LCTL :
                     keycode == MY_OS_SFT ? MOD_LSFT : MOD_LALT;
                 set_oneshot_mods(os_mod | get_oneshot_mods());
+            }
+            return false;
+        case LT(0, KC_F14):
+            if (record->event.pressed) {
+                if (record->tap.count) {
+                    set_oneshot_layer(1, ONESHOT_START);
+                } else {
+                    clear_mods();
+                    clear_weak_mods();
+                    clear_oneshot_mods();
+                }
             }
             return false;
         case LT(0, KC_F15) ... LT(0, KC_F19):
@@ -448,13 +460,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             case KC_LEFT: add_weak_mods(MOD_LSFT);
                             case KC_RGHT: morph_code = KC_TAB;
                                 if (morph_type == CTRL_TAB_MORPH) {
-                                    clear_mods();
+                                    del_mods(saved_mods);
                                     add_weak_mods(MOD_LCTL);
                                 }
                         }
                         break;
                     case CTRL_YanZ_MORPH:
-                        clear_mods();
+                        del_mods(saved_mods);
                         add_weak_mods(MOD_LCTL);
                         morph_code =
                             (keycode == KC_LEFT) ? KC_Z    : KC_Y;
@@ -492,7 +504,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 if ((mod_state | oneshot_mods) & MOD_MASK_SHIFT) {
                     del_oneshot_mods(MOD_MASK_SHIFT);
-                    unregister_mods(MOD_MASK_SHIFT);
+                    del_mods(MOD_MASK_SHIFT);
                     register_code(KC_DOT);
                     set_mods(mod_state);
                     dot_registered = true;
@@ -565,6 +577,7 @@ void matrix_scan_user(void) {
 }
 
 enum combos {
+    CMB_F14,
     CMB_APP,
     CMB_PSCR,
     CMB_LNG1,
@@ -578,19 +591,21 @@ enum combos {
     CMB_MS_BTN3,
 };
 
-const uint16_t PROGMEM cmb_app[]       = {KC_Z,         KC_M,         COMBO_END};
-const uint16_t PROGMEM cmb_pscr[]      = {KC_M,         KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_lng1[]      = {LCTL_T(KC_S), KC_G,         COMBO_END};
-const uint16_t PROGMEM cmb_lng2[]      = {KC_Y,         RCTL_T(KC_E), COMBO_END};
-const uint16_t PROGMEM cmb_int4[]      = {KC_Z,         KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_os_ctl[]    = {KC_D,         KC_W,         COMBO_END};
-const uint16_t PROGMEM cmb_os_sft[]    = {KC_L,         KC_W,         COMBO_END};
-const uint16_t PROGMEM cmb_os_alt[]    = {KC_L,         KC_D,         COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn1[]   = {LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn2[]   = {LALT_T(KC_R), LSFT_T(KC_T), COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn3[]   = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
+const uint16_t PROGMEM cmb_f14[]     = {KC_Z,  KC_M,  KC_C,         COMBO_END};
+const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,         COMBO_END};
+const uint16_t PROGMEM cmb_pscr[]    = {KC_M,         KC_C,         COMBO_END};
+const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,         COMBO_END};
+const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E), COMBO_END};
+const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,         COMBO_END};
+const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,         COMBO_END};
+const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,         COMBO_END};
+const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,         COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn1[] = {LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T), COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
 
 combo_t key_combos[] = {
+    [CMB_F14]        = COMBO(cmb_f14,       LT(0, KC_F14)),
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
     [CMB_PSCR]       = COMBO(cmb_pscr,      LT(0, KC_PSCR)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
