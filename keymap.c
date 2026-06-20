@@ -125,41 +125,6 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-void send_report_user(uint16_t keycode) {
-    static const uint16_t brcts[][2] = {
-        { RSFT_T(KC_QUOT), RSFT_T(KC_QUOT) },
-        { RCTL_T(KC_9),    RALT_T(KC_0)    },
-        { S(KC_LBRC),      S(KC_RBRC)      },
-        { S(KC_COMM),      S(KC_DOT)       },
-        { KC_QUOT,         KC_QUOT         },
-        { KC_LBRC,         KC_RBRC         },
-        { KC_GRV,          KC_GRV          },
-        { 0,               -1              },
-    };
-    static const uint8_t null_id = ARRAY_SIZE(brcts) - 1;
-    static uint8_t reception_id  = null_id;
-
-    clear_weak_mods();
-    if (keycode == brcts[reception_id][1]) {
-        tap_code(KC_LEFT);
-        reception_id = null_id;
-        return;
-    }
-    for (reception_id = 0; reception_id < null_id; reception_id++) {
-        if (keycode == brcts[reception_id][0]) {
-            return;
-        }
-    }
-}
-
-void tap_code_attached(uint16_t keycode) {
-    if (is_caps_word_on()) {
-        add_weak_mods(MOD_LSFT);
-    }
-    tap_code(keycode & 0xFF);
-    send_report_user(keycode);
-}
-
 enum my_keycodes {
     MY_OS_CTL = SAFE_RANGE,
     MY_OS_SFT,
@@ -233,14 +198,54 @@ void mts_hold_on_all(void) {
      mts_hold_on(&rmts);
 }
 
+void send_report_user(uint16_t keycode) {
+    static const uint16_t brcts[][2] = {
+        { S(KC_QUOT), S(KC_QUOT) },
+        { S(KC_LBRC), S(KC_RBRC) },
+        { S(KC_COMM), S(KC_DOT)  },
+        { S(KC_9),    S(KC_0)    },
+        { KC_QUOT,    KC_QUOT    },
+        { KC_LBRC,    KC_RBRC    },
+        { KC_GRV,     KC_GRV     },
+        { 0,          -1         },
+    };
+    static const uint8_t null_id = ARRAY_SIZE(brcts) - 1;
+    static uint8_t reception_id  = null_id;
+    keycode = keycode & 0xFF;
+
+    if (!get_highest_layer(layer_state)) {
+        reception_id = null_id;
+        return;
+    }
+    if (get_weak_mods() == MOD_LSFT
+        || is_caps_word_on()) {
+        keycode |= MOD_LSFT << 8;
+    }
+    clear_weak_mods();
+    if (keycode == brcts[reception_id][1]) {
+        tap_code(KC_LEFT);
+        reception_id = null_id;
+        return;
+    }
+    for (reception_id = 0; reception_id < null_id; reception_id++) {
+        if (keycode == brcts[reception_id][0]) {
+            return;
+        }
+    }
+}
+
 void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
     mt_cycle_t *same  = record.event.key.row == 1 ? &lmts : &rmts;
     mt_cycle_t *other = record.event.key.row == 5 ? &lmts : &rmts;
     uint16_t poped_key;
 
     mts_hold_on(other);
+    if (is_caps_word_on()) {
+        add_weak_mods(MOD_LSFT);
+    }
     while (dequeue(same, &poped_key)) {
-        tap_code_attached(poped_key);
+        tap_code(QK_MOD_TAP_GET_TAP_KEYCODE(poped_key));
+        send_report_user(poped_key);
         if (keycode == poped_key) {
             return;
         }
@@ -286,16 +291,30 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     mts_hold_on_all();
 
     switch (keycode) {
-        case LT(0, KC_INT4):
-            if (record->tap.count) {
+        case LT(0, KC_APP):
+            if (!record->tap.count) {
                 if (record->event.pressed) {
-                    add_weak_mods(MOD_LGUI);
-                    register_code(KC_SLSH);
+                    register_code(KC_DEL);
                 } else {
-                    unregister_code(KC_SLSH);
+                    unregister_code(KC_DEL);
                 }
-            } else if (record->event.pressed) {
-                set_oneshot_layer(3, ONESHOT_START);
+                return false;
+            }
+            break;
+        case LT(0, KC_PSCR):
+            if (!record->tap.count) {
+                if (record->event.pressed) {
+                    set_oneshot_layer(3, ONESHOT_START);
+                }
+                return false;
+            }
+            break;
+        case KC_INT4:
+            if (record->event.pressed) {
+                add_weak_mods(MOD_LGUI);
+                register_code(KC_SLSH);
+            } else {
+                unregister_code(KC_SLSH);
             }
             return false;
         case MY_OS_CTL ... MY_OS_ALT:
@@ -306,81 +325,72 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 set_oneshot_mods(os_mod | get_oneshot_mods());
             }
             return false;
-        case LT(0, KC_F15):
-            static uint16_t timer[4] = {0};
-            if (record->event.pressed) {
-                if (record->tap.count) {
-                    morph_type =
-                        timer_elapsed(timer[0]) > (QUICK_TAP_TERM << 3) ?
-                        CTRL_YanZ_MORPH : FOUR_MOVES_MORPH;
-                } else {
-                    add_weak_mods(MOD_LALT);
-                    tap_code(KC_F4);
-                }
-                timer[0] = timer_read();
-            }
-            return false;
-        case LT(0, KC_F16) ... LT(0, KC_F18):
+        case LT(0, KC_F15) ... LT(0, KC_F19):
             keycode          = keycode & 0xFF;
             uint8_t index    = keycode - KC_F15;
             uint8_t mod      =
                     keycode == KC_F16 ? MOD_LALT :
-                    keycode == KC_F17 ? MOD_LSFT : MOD_LCTL;
-            uint8_t KC_EDIT  = 0;
+                    keycode == KC_F17 ? MOD_LSFT :
+                    keycode == KC_F18 ? MOD_LCTL : 0;
+            static uint16_t timer[5]    = {0};
+            static uint8_t  KC_EDIT     = 0;
+            static bool edit_registered = false;
 
+            if (edit_registered) {
+                unregister_code(KC_EDIT);
+                edit_registered = false;
+            }
             if (record->event.pressed) {
+                KC_EDIT = 0;
                 if (record->tap.count) {
                     if (timer_elapsed(timer[index]) > (QUICK_TAP_TERM << 3)) {
-                        if (get_mods() & mod) {
-                            unregister_mods(mod);
-                        } else {
-                            register_mods(mod);
-                            if (keycode == KC_F16) {
-                                tap_code(KC_TAB);
+                        if (mod) {
+                            if (get_mods() & mod) {
+                                unregister_mods(mod);
+                            } else {
+                                register_mods(mod);
+                                if (keycode == KC_F16) {
+                                    tap_code(KC_TAB);
+                                }
                             }
                         }
+                        morph_type =
+                            keycode == KC_F15 ? CTRL_YanZ_MORPH :
+                            keycode == KC_F19 ? TAB_MORPH : 0;
                     } else {
-                        if (keycode == KC_F17) {
-                            KC_EDIT = KC_V;
-                        } else {
-                            morph_type =
-                                keycode == KC_F16 ? WWW_MORPH : CTRL_TAB_MORPH;
-                            if (keycode == KC_F16) {
-                                tap_code(KC_ESC);
-                            }
+                        if (keycode == KC_F16) {
+                            tap_code(KC_ESC);
                         }
                         unregister_mods(mod);
+                        KC_EDIT     =
+                            keycode == KC_F17 ? KC_V : 0;
+                        morph_type  =
+                            keycode == KC_F15 ? FOUR_MOVES_MORPH :
+                            keycode == KC_F16 ? WWW_MORPH :
+                            keycode == KC_F17 ? 0 :
+                            keycode == KC_F18 ? CTRL_TAB_MORPH : VOL_MORPH;
                     }
                 } else {
-                    if (keycode == KC_F16) {
-                        KC_EDIT = KC_C;
-                    } else {
-                        tap_code(keycode == KC_F17 ? KC_F15 : KC_F16);
+                    if (keycode == KC_F15) {
+                        add_weak_mods(MOD_LALT);
+                        tap_code(KC_F4);
                     }
+                    tap_code(keycode == KC_F17 ? KC_F15 :
+                             keycode == KC_F18 ? KC_F16 : 0);
+                    KC_EDIT     =
+                        keycode == KC_F16 ? KC_C :
+                        keycode == KC_F19 ? KC_X : 0;
+                    morph_type  = 0;
                 }
                 if (KC_EDIT) {
                     uint8_t saved_mods = get_mods();
                     del_mods(saved_mods);
                     add_weak_mods(MOD_LCTL);
-                    tap_code(KC_EDIT);
+                    register_code(KC_EDIT);
                     set_mods(saved_mods);
+                    edit_registered = true;
                 }
                 timer[index] = timer_read();
-            }
-            return false;
-        case LT(0, KC_F19):
-            static bool del_registered = false;
-            if (record->event.pressed) {
-                morph_type =
-                    record->tap.count == 1 ? TAB_MORPH :
-                    record->tap.count      ? VOL_MORPH : 0;
-                if (!record->tap.count) {
-                    register_code(KC_DEL);
-                    del_registered = true;
-                }
-            } else if (del_registered) {
-                unregister_code(KC_DEL);
-                del_registered = false;
             }
             return false;
         case LT(0, KC_F20):
@@ -391,7 +401,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case LT(0, KC_LNG1):
         case LT(0, KC_LNG2):
             if (record->event.pressed) {
-                tap_code(((keycode & 0xFF) == KC_LNG2) ? KC_F13 : KC_F14);
+                tap_code((keycode & 0xFF) == KC_LNG2 ? KC_F13 : KC_F14);
                 if (record->tap.count) {
                     caps_word_off();
                 } else {
@@ -557,9 +567,9 @@ void matrix_scan_user(void) {
 enum combos {
     CMB_APP,
     CMB_PSCR,
-    CMB_INT4,
     CMB_LNG1,
     CMB_LNG2,
+    CMB_INT4,
     CMB_OS_CTL,
     CMB_OS_SFT,
     CMB_OS_ALT,
@@ -570,9 +580,9 @@ enum combos {
 
 const uint16_t PROGMEM cmb_app[]       = {KC_Z,         KC_M,         COMBO_END};
 const uint16_t PROGMEM cmb_pscr[]      = {KC_M,         KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_int4[]      = {KC_Z,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]      = {LCTL_T(KC_S), KC_G,         COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]      = {KC_Y,         RCTL_T(KC_E), COMBO_END};
+const uint16_t PROGMEM cmb_int4[]      = {KC_Z,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_os_ctl[]    = {KC_D,         KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_sft[]    = {KC_L,         KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_alt[]    = {KC_L,         KC_D,         COMBO_END};
@@ -581,11 +591,11 @@ const uint16_t PROGMEM cmb_ms_btn2[]   = {LALT_T(KC_R), LSFT_T(KC_T), COMBO_END}
 const uint16_t PROGMEM cmb_ms_btn3[]   = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
 
 combo_t key_combos[] = {
-    [CMB_APP]        = COMBO(cmb_app,       KC_APP),
-    [CMB_PSCR]       = COMBO(cmb_pscr,      KC_PSCR),
-    [CMB_INT4]       = COMBO(cmb_int4,      LT(0, KC_INT4)),
+    [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
+    [CMB_PSCR]       = COMBO(cmb_pscr,      LT(0, KC_PSCR)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
+    [CMB_INT4]       = COMBO(cmb_int4,      KC_INT4),
     [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    MY_OS_CTL),
     [CMB_OS_SFT]     = COMBO(cmb_os_sft,    MY_OS_SFT),
     [CMB_OS_ALT]     = COMBO(cmb_os_alt,    MY_OS_ALT),
