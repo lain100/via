@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdint.h>
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
@@ -26,12 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     (HOMEROW_MASK & (1U << ((r).event.key.row)))    \
     && IS_QK_MOD_TAP((k))                           \
     && (((k) >> 8) & (m))                           \
-)
-
-#define IS_QUICK_SUCCESSION_INPUT(k1, r, k2, m) (       \
-    IS_HOMEROW((k1), (r), (m))                          \
-    && QK_MOD_TAP_GET_TAP_KEYCODE((k2)) <= KC_Z         \
-    && last_matrix_activity_elapsed() <= QUICK_TAP_TERM \
 )
 
 #define UNILATERAL_MASK(n, m) (     \
@@ -71,13 +64,6 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
     if (record->event.pressed) {
-        if (IS_QUICK_SUCCESSION_INPUT(keycode, *record, inter_keycode, MOD_HYPR)
-            && !IS_UNILATERAL_INPUT(inter_record, *record, 0x02)) {
-            tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
-            pressed_keys[tap.index] |= tap.bitmask;
-            record->keycode = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
-        }
-
         inter_keycode = keycode;
         inter_record  = *record;
     } else {
@@ -96,6 +82,9 @@ uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
         || IS_HOMEROW(keycode, *record, MOD_LALT | MOD_LGUI)) {
         return TAPPING_TERM << 1;
     }
+    if (IS_QK_ONE_SHOT_MOD(keycode)) {
+        return TAPPING_TERM << 2;
+    }
     return TAPPING_TERM;
 }
 
@@ -110,7 +99,9 @@ uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool get_permissive_hold(uint16_t keycode, keyrecord_t *record) {
-    return IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode);
+    return IS_QK_LAYER_TAP(keycode)
+        || IS_QK_MOD_TAP(keycode)
+        || IS_QK_ONE_SHOT_MOD(keycode);
 }
 
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
@@ -125,12 +116,6 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     }
     return false;
 }
-
-enum my_keycodes {
-    MY_OS_CTL = SAFE_RANGE,
-    MY_OS_SFT,
-    MY_OS_ALT,
-};
 
 enum arrowkeys_types {
     TAB_MORPH = 1,
@@ -302,28 +287,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 return false;
             }
             break;
-        case LT(0, KC_PSCR):
-            if (!record->tap.count) {
-                if (record->event.pressed) {
-                    set_oneshot_layer(3, ONESHOT_START);
-                }
-                return false;
-            }
-            break;
         case KC_INT4:
             if (record->event.pressed) {
                 add_weak_mods(MOD_LGUI);
                 register_code(KC_SLSH);
             } else {
                 unregister_code(KC_SLSH);
-            }
-            return false;
-        case MY_OS_CTL ... MY_OS_ALT:
-            if (record->event.pressed) {
-                uint8_t os_mod =
-                    keycode == MY_OS_CTL ? MOD_LCTL :
-                    keycode == MY_OS_SFT ? MOD_LSFT : MOD_LALT;
-                set_oneshot_mods(os_mod | get_oneshot_mods());
             }
             return false;
         case LT(0, KC_F14):
@@ -365,10 +334,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                     tap_code(KC_TAB);
                                 }
                             }
+                        } else {
+                            morph_type  =
+                                keycode == KC_F15 ? CTRL_YanZ_MORPH : TAB_MORPH;
                         }
-                        morph_type =
-                            keycode == KC_F15 ? CTRL_YanZ_MORPH :
-                            keycode == KC_F19 ? TAB_MORPH : 0;
                     } else {
                         if (keycode == KC_F16) {
                             tap_code(KC_ESC);
@@ -579,10 +548,11 @@ void matrix_scan_user(void) {
 enum combos {
     CMB_F14,
     CMB_APP,
-    CMB_PSCR,
     CMB_LNG1,
     CMB_LNG2,
+    CMB_MOL3,
     CMB_INT4,
+    CMB_PSCR,
     CMB_OS_CTL,
     CMB_OS_SFT,
     CMB_OS_ALT,
@@ -593,10 +563,11 @@ enum combos {
 
 const uint16_t PROGMEM cmb_f14[]     = {KC_Z,  KC_M,  KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,         COMBO_END};
-const uint16_t PROGMEM cmb_pscr[]    = {KC_M,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,         COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E), COMBO_END};
+const uint16_t PROGMEM cmb_mol3[]    = {KC_M,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,         COMBO_END};
+const uint16_t PROGMEM cmb_pscr[]    = {KC_L,  KC_D,  KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,         COMBO_END};
@@ -607,13 +578,14 @@ const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
 combo_t key_combos[] = {
     [CMB_F14]        = COMBO(cmb_f14,       LT(0, KC_F14)),
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
-    [CMB_PSCR]       = COMBO(cmb_pscr,      LT(0, KC_PSCR)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
+    [CMB_MOL3]       = COMBO(cmb_mol3,      LT(3, 0)),
     [CMB_INT4]       = COMBO(cmb_int4,      KC_INT4),
-    [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    MY_OS_CTL),
-    [CMB_OS_SFT]     = COMBO(cmb_os_sft,    MY_OS_SFT),
-    [CMB_OS_ALT]     = COMBO(cmb_os_alt,    MY_OS_ALT),
+    [CMB_PSCR]       = COMBO(cmb_pscr,      KC_PSCR),
+    [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    OSM(MOD_LCTL)),
+    [CMB_OS_SFT]     = COMBO(cmb_os_sft,    OSM(MOD_LSFT)),
+    [CMB_OS_ALT]     = COMBO(cmb_os_alt,    OSM(MOD_LALT)),
     [CMB_MS_BTN1]    = COMBO(cmb_ms_btn1,   KC_MS_BTN1),
     [CMB_MS_BTN2]    = COMBO(cmb_ms_btn2,   KC_MS_BTN2),
     [CMB_MS_BTN3]    = COMBO(cmb_ms_btn3,   KC_MS_BTN3),
