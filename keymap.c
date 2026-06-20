@@ -68,7 +68,6 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
         inter_record  = *record;
     } else {
         tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
-
         if (pressed_keys[tap.index] & tap.bitmask) {
             pressed_keys[tap.index] &= ~tap.bitmask;
             record->tap.count++;
@@ -277,6 +276,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     mts_hold_on_all();
 
     switch (keycode) {
+        case LT(3, 0):
+            if (record->tap.count) {
+                if (record->event.pressed) {
+                    set_oneshot_layer(3, ONESHOT_START);
+                }
+                return false;
+            }
+            break;
         case LT(0, KC_APP):
             if (!record->tap.count) {
                 if (record->event.pressed) {
@@ -295,15 +302,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 unregister_code(KC_SLSH);
             }
             return false;
-        case LT(0, KC_F14):
+        case KC_F14:
             if (record->event.pressed) {
-                if (record->tap.count) {
-                    set_oneshot_layer(1, ONESHOT_START);
-                } else {
-                    clear_mods();
-                    clear_weak_mods();
-                    clear_oneshot_mods();
-                }
+                SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200)
+                        "https://web.archive.org/web/" SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
         case LT(0, KC_F15) ... LT(0, KC_F19):
@@ -346,22 +348,19 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         KC_EDIT     =
                             keycode == KC_F17 ? KC_V : 0;
                         morph_type  =
-                            keycode == KC_F15 ? FOUR_MOVES_MORPH :
+                            keycode == KC_F15 ? CTRL_YanZ_MORPH :
                             keycode == KC_F16 ? WWW_MORPH :
                             keycode == KC_F17 ? 0 :
                             keycode == KC_F18 ? CTRL_TAB_MORPH : VOL_MORPH;
                     }
                 } else {
-                    if (keycode == KC_F15) {
-                        add_weak_mods(MOD_LALT);
-                        tap_code(KC_F4);
-                    }
                     tap_code(keycode == KC_F17 ? KC_F15 :
                              keycode == KC_F18 ? KC_F16 : 0);
                     KC_EDIT     =
                         keycode == KC_F16 ? KC_C :
                         keycode == KC_F19 ? KC_X : 0;
-                    morph_type  = 0;
+                    morph_type  =
+                        keycode == KC_F15 ? FOUR_MOVES_MORPH : 0;
                 }
                 if (KC_EDIT) {
                     uint8_t saved_mods = get_mods();
@@ -377,6 +376,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case LT(0, KC_F20):
             if (record->event.pressed) {
                 layer_move(record->tap.count ? (get_highest_layer(layer_state) % 2 + 1) : 4);
+            }
+            return false;
+        case KC_F21:
+            if (record->event.pressed) {
+                SEND_STRING(". ");
+                add_oneshot_mods(MOD_LSFT);
             }
             return false;
         case LT(0, KC_LNG1):
@@ -546,10 +551,10 @@ void matrix_scan_user(void) {
 }
 
 enum combos {
-    CMB_F14,
     CMB_APP,
     CMB_LNG1,
     CMB_LNG2,
+    CMB_OSL1,
     CMB_MOL3,
     CMB_INT4,
     CMB_PSCR,
@@ -561,10 +566,10 @@ enum combos {
     CMB_MS_BTN3,
 };
 
-const uint16_t PROGMEM cmb_f14[]     = {KC_Z,  KC_M,  KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,         COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,         COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E), COMBO_END};
+const uint16_t PROGMEM cmb_osl1[]    = {KC_Z,  KC_M,  KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_mol3[]    = {KC_M,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,         COMBO_END};
 const uint16_t PROGMEM cmb_pscr[]    = {KC_L,  KC_D,  KC_W,         COMBO_END};
@@ -576,10 +581,10 @@ const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T), COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
 
 combo_t key_combos[] = {
-    [CMB_F14]        = COMBO(cmb_f14,       LT(0, KC_F14)),
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
+    [CMB_OSL1]       = COMBO(cmb_osl1,      OSL(1)),
     [CMB_MOL3]       = COMBO(cmb_mol3,      LT(3, 0)),
     [CMB_INT4]       = COMBO(cmb_int4,      KC_INT4),
     [CMB_PSCR]       = COMBO(cmb_pscr,      KC_PSCR),
