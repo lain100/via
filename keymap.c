@@ -557,42 +557,42 @@ enum combos {
     CMB_LNG1,
     CMB_LNG2,
     CMB_OSL1,
-    CMB_MOL3,
     CMB_INT4,
     CMB_PSCR,
     CMB_OS_CTL,
     CMB_OS_SFT,
     CMB_OS_ALT,
+    CMB_OS_ML3,
     CMB_MS_BTN1,
     CMB_MS_BTN2,
     CMB_MS_BTN3,
 };
 
-const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,         COMBO_END};
-const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,         COMBO_END};
-const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E), COMBO_END};
-const uint16_t PROGMEM cmb_osl1[]    = {KC_Z,  KC_M,  KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_mol3[]    = {KC_M,         KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,         COMBO_END};
-const uint16_t PROGMEM cmb_pscr[]    = {KC_L,  KC_D,  KC_W,         COMBO_END};
-const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,         COMBO_END};
-const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,         COMBO_END};
-const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,         COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn1[] = {LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T), COMBO_END};
-const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S), COMBO_END};
+const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,                       COMBO_END};
+const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,                       COMBO_END};
+const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E),               COMBO_END};
+const uint16_t PROGMEM cmb_osl1[]    = {KC_M,         KC_C,                       COMBO_END};
+const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,                       COMBO_END};
+const uint16_t PROGMEM cmb_pscr[]    = {KC_L,         KC_D,         KC_W,         COMBO_END};
+const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,                       COMBO_END};
+const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,                       COMBO_END};
+const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,                       COMBO_END};
+const uint16_t PROGMEM cmb_os_ml3[]  = {LALT_T(KC_R), LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn1[] = {LSFT_T(KC_T), LCTL_T(KC_S),               COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T),               COMBO_END};
+const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S),               COMBO_END};
 
 combo_t key_combos[] = {
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
     [CMB_OSL1]       = COMBO(cmb_osl1,      OSL(1)),
-    [CMB_MOL3]       = COMBO(cmb_mol3,      LT(3, 0)),
     [CMB_INT4]       = COMBO(cmb_int4,      KC_INT4),
     [CMB_PSCR]       = COMBO(cmb_pscr,      KC_PSCR),
     [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    OSM(MOD_LCTL)),
     [CMB_OS_SFT]     = COMBO(cmb_os_sft,    OSM(MOD_LSFT)),
     [CMB_OS_ALT]     = COMBO(cmb_os_alt,    OSM(MOD_LALT)),
+    [CMB_OS_ML3]     = COMBO(cmb_os_ml3,    LT(3, KC_NO)),
     [CMB_MS_BTN1]    = COMBO(cmb_ms_btn1,   KC_MS_BTN1),
     [CMB_MS_BTN2]    = COMBO(cmb_ms_btn2,   KC_MS_BTN2),
     [CMB_MS_BTN3]    = COMBO(cmb_ms_btn3,   KC_MS_BTN3),
