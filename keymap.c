@@ -276,9 +276,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     mts_hold_on_all();
+    if (keycode != LT(3, KC_NO)
+        && !record->event.pressed) {
+        clear_oneshot_layer_state(ONESHOT_PRESSED);
+    }
 
     switch (keycode) {
-        case LT(3, 0):
+        case LT(3, KC_NO):
             if (record->tap.count) {
                 if (record->event.pressed) {
                     set_oneshot_layer(3, ONESHOT_START);
@@ -518,9 +522,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_QUOT:
             caps_word_off();
             break;
-    }
-    if (!record->event.pressed) {
-        clear_oneshot_layer_state(ONESHOT_PRESSED);
     }
     return true;
 }
