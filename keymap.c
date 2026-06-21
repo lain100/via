@@ -52,16 +52,16 @@ static uint8_t pressed_keys[32];
 
 static uint16_t    inter_keycode;
 static keyrecord_t inter_record;
-static uint8_t     cur_layer = 0;
+static uint8_t momentary_layer = 0;
 
 bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_LAYER_TAP(keycode)) {
-        cur_layer = (keycode >> 8) & 0x0F;
-        if (cur_layer == 4) {
+        momentary_layer = (keycode >> 8) & 0x0F;
+        if (momentary_layer == 4) {
             keyball_set_scroll_mode(record->event.pressed);
         }
         if (!record->event.pressed) {
-            cur_layer = 0;
+            momentary_layer = 0;
         }
     }
     if (record->event.pressed) {
@@ -70,6 +70,8 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     } else {
         tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
         if (pressed_keys[tap.index] & tap.bitmask) {
+            uint8_t mod = (keycode >> 8) & 0x1F;
+            unregister_mods(mod & 0x10 ? (mod << 4) : mod);
             pressed_keys[tap.index] &= ~tap.bitmask;
             record->tap.count++;
         }
@@ -79,11 +81,9 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_LAYER_TAP(keycode)
+        || IS_QK_ONE_SHOT_MOD(keycode)
         || IS_HOMEROW(keycode, *record, MOD_HYPR & ~MOD_LSFT)) {
         return TAPPING_TERM << 1;
-    }
-    if (IS_QK_ONE_SHOT_MOD(keycode)) {
-        return TAPPING_TERM << 2;
     }
     return TAPPING_TERM;
 }
@@ -105,7 +105,7 @@ bool get_permissive_hold(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    if (cur_layer == 0
+    if (momentary_layer == 0
         && IS_QK_MOD_TAP(keycode)
         && (inter_keycode & 0xFF) <= KC_Z
         && !IS_UNILATERAL_INPUT(*record, inter_record, 0x02)) {
@@ -122,8 +122,8 @@ enum arrowkeys_types {
     TAB_MORPH = 1,
     VOL_MORPH,
     WWW_MORPH,
+    CTRL_YZ_MORPH,
     CTRL_TAB_MORPH,
-    CTRL_YanZ_MORPH,
     FOUR_MOVES_MORPH,
 };
 
@@ -197,15 +197,15 @@ void within_next_word(uint16_t keycode) {
         { 0,          -1         },
     };
     static const uint8_t null_id = ARRAY_SIZE(brcts) - 1;
-    static uint8_t reception_id  = null_id;
+    static uint8_t  reception_id = null_id;
     keycode = keycode & 0xFF;
 
     if (!get_highest_layer(layer_state)) {
         reception_id = null_id;
         return;
     }
-    if (get_weak_mods() == MOD_LSFT
-        || is_caps_word_on()) {
+    if (is_caps_word_on()
+        || get_weak_mods() == MOD_LSFT) {
         keycode |= MOD_LSFT << 8;
     }
     clear_weak_mods();
@@ -255,7 +255,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
         } else if (!record->tap.count) {
             uint8_t mod = (keycode >> 8) & 0x1F;
-            unregister_mods((mod & 0x10) ? (mod << 4) : mod);
+            unregister_mods(mod & 0x10 ? (mod << 4) : mod);
             procoss_pended_keys(keycode, *record);
             return false;
         }
@@ -361,7 +361,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             }
                         } else {
                             morph_type  =
-                                keycode == KC_F15 ? CTRL_YanZ_MORPH : TAB_MORPH;
+                                keycode == KC_F15 ? CTRL_YZ_MORPH : TAB_MORPH;
                         }
                     } else {
                         if (keycode == KC_F16) {
@@ -371,7 +371,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         KC_EDIT     =
                             keycode == KC_F17 ? KC_V : 0;
                         morph_type  =
-                            keycode == KC_F15 ? CTRL_YanZ_MORPH :
+                            keycode == KC_F15 ? CTRL_YZ_MORPH :
                             keycode == KC_F16 ? WWW_MORPH :
                             keycode == KC_F17 ? 0 :
                             keycode == KC_F18 ? CTRL_TAB_MORPH : VOL_MORPH;
@@ -387,7 +387,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 if (KC_EDIT) {
                     uint8_t saved_mods = get_mods();
-                    del_mods(saved_mods);
+                    clear_mods();
                     add_weak_mods(MOD_LCTL);
                     register_code(KC_EDIT);
                     set_mods(saved_mods);
@@ -428,49 +428,44 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
                 switch (keycode) {
                     case KC_UP:
-                        switch (morph_type) {
-                            case VOL_MORPH:
-                            case WWW_MORPH:
-                                return true;
-                        }
                     case KC_DOWN:
                         switch (morph_type) {
-                            case TAB_MORPH:
-                            case CTRL_YanZ_MORPH:
+                            case TAB_MORPH ... CTRL_YZ_MORPH:
                                 return true;
                         }
                 }
                 switch (morph_type) {
                     case TAB_MORPH:
-                    case CTRL_TAB_MORPH:
-                        switch (keycode) {
-                            case KC_UP:   morph_code = KC_PGUP;
-                                break;
-                            case KC_DOWN: morph_code = KC_PGDN;
-                                break;
-                            case KC_LEFT: add_weak_mods(MOD_LSFT);
-                            case KC_RGHT: morph_code = KC_TAB;
-                                if (morph_type == CTRL_TAB_MORPH) {
-                                    del_mods(saved_mods);
-                                    add_weak_mods(MOD_LCTL);
-                                }
+                        if (keycode == KC_LEFT) {
+                            add_weak_mods(MOD_LSFT);
                         }
-                        break;
-                    case CTRL_YanZ_MORPH:
-                        del_mods(saved_mods);
-                        add_weak_mods(MOD_LCTL);
-                        morph_code =
-                            (keycode == KC_LEFT) ? KC_Z    : KC_Y;
+                        morph_code = KC_TAB;
                         break;
                     case VOL_MORPH:
                         morph_code =
-                            (keycode == KC_DOWN) ? KC_MUTE :
-                            (keycode == KC_LEFT) ? KC_VOLD : KC_VOLU;
+                            keycode == KC_LEFT ? KC_VOLD : KC_VOLU;
                         break;
                     case WWW_MORPH:
                         morph_code =
-                            (keycode == KC_DOWN) ? KC_WHOM :
-                            (keycode == KC_LEFT) ? KC_WBAK : KC_WFWD;
+                            keycode == KC_LEFT ? KC_WBAK : KC_WFWD;
+                        break;
+                    case CTRL_YZ_MORPH:
+                        morph_code =
+                            keycode == KC_LEFT ? KC_Z    : KC_Y;
+                        clear_mods();
+                        add_weak_mods(MOD_LCTL);
+                        break;
+                    case CTRL_TAB_MORPH:
+                        switch (keycode) {
+                            case KC_LEFT: add_weak_mods(MOD_LSFT);
+                            case KC_RGHT: morph_code = KC_TAB;
+                                clear_mods();
+                                add_weak_mods(MOD_LCTL);
+                                break;
+                            default:
+                                morph_code =
+                                    keycode == KC_UP ? KC_PGUP : KC_PGDN;
+                        }
                         break;
                     case FOUR_MOVES_MORPH:
                         four_moves(keycode);
@@ -488,25 +483,23 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             break;
         case KC_COMM:
-            static bool dot_registered = false;
-            uint8_t     mod_state      = get_mods();
-            uint8_t     oneshot_mods   = get_oneshot_mods();
+            static uint8_t registered_key;
+            uint8_t mod_state    = get_mods();
+            uint8_t oneshot_mods = get_oneshot_mods();
 
             if (record->event.pressed) {
+                registered_key = KC_COMM;
                 if ((mod_state | oneshot_mods) & MOD_MASK_SHIFT) {
-                    del_oneshot_mods(MOD_MASK_SHIFT);
+                    registered_key = KC_DOT;
                     del_mods(MOD_MASK_SHIFT);
-                    register_code(KC_DOT);
-                    set_mods(mod_state);
-                    dot_registered = true;
-                    return false;
+                    del_oneshot_mods(MOD_MASK_SHIFT);
                 }
-            } else if (dot_registered) {
-                unregister_code(KC_DOT);
-                dot_registered = false;
-                return false;
+                register_code(registered_key);
+                set_mods(mod_state);
+            } else {
+                unregister_code(registered_key);
             }
-            break;
+            return false;
         case LT(4, KC_ENT):
             static bool is_layer4_enabled = false;
             if (!record->tap.count) {
