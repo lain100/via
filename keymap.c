@@ -52,15 +52,16 @@ static uint8_t pressed_keys[32];
 
 static uint16_t    inter_keycode;
 static keyrecord_t inter_record;
+static uint8_t     cur_layer = 0;
 
 bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_LAYER_TAP(keycode)) {
-        uint8_t layer_bit = (keycode >> 8) & 0x0F;
-        uint8_t n         = (layer_bit & 0x01) + (layer_bit & 0x02) + (layer_bit & 0x04);
-        if (record->event.pressed) {
-            layer_on(n);
-        } else {
-            layer_off(n);
+        cur_layer = (keycode >> 8) & 0x0F;
+        if (cur_layer == 4) {
+            keyball_set_scroll_mode(record->event.pressed);
+        }
+        if (!record->event.pressed) {
+            cur_layer = 0;
         }
     }
     if (record->event.pressed) {
@@ -78,7 +79,7 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_LAYER_TAP(keycode)
-        || IS_HOMEROW(keycode, *record, MOD_LALT | MOD_LGUI)) {
+        || IS_HOMEROW(keycode, *record, MOD_HYPR & ~MOD_LSFT)) {
         return TAPPING_TERM << 1;
     }
     if (IS_QK_ONE_SHOT_MOD(keycode)) {
@@ -98,15 +99,16 @@ uint16_t get_quick_tap_term(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool get_permissive_hold(uint16_t keycode, keyrecord_t *record) {
-    return IS_QK_LAYER_TAP(keycode)
-        || IS_QK_MOD_TAP(keycode)
+    return IS_QK_MOD_TAP(keycode)
+        || IS_QK_LAYER_TAP(keycode)
         || IS_QK_ONE_SHOT_MOD(keycode);
 }
 
 bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    if ((!IS_UNILATERAL_INPUT(*record, inter_record, 0x02)
-         && IS_QK_MOD_TAP(keycode)
-         && (inter_keycode & 0xFF) <= KC_Z)) {
+    if (cur_layer == 0
+        && IS_QK_MOD_TAP(keycode)
+        && (inter_keycode & 0xFF) <= KC_Z
+        && !IS_UNILATERAL_INPUT(*record, inter_record, 0x02)) {
         tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
         pressed_keys[tap.index] |= tap.bitmask;
         record->tap.interrupted = false;
@@ -183,7 +185,7 @@ void mts_hold_on_all(void) {
      mts_hold_on(&rmts);
 }
 
-void send_report_user(uint16_t keycode) {
+void within_next_word(uint16_t keycode) {
     static const uint16_t brcts[][2] = {
         { S(KC_QUOT), S(KC_QUOT) },
         { S(KC_LBRC), S(KC_RBRC) },
@@ -230,7 +232,7 @@ void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
             add_weak_mods(MOD_LSFT);
         }
         tap_code(QK_MOD_TAP_GET_TAP_KEYCODE(poped_key));
-        send_report_user(poped_key);
+        within_next_word(poped_key);
         if (keycode == poped_key) {
             return;
         }
@@ -308,6 +310,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         "https://web.archive.org/web/" SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
+        case KC_F15:
+            if (record->event.pressed) {
+                SEND_STRING("===");
+            }
+            return false;
+        case KC_F18:
+            if (record->event.pressed) {
+                SEND_STRING(". ");
+                add_oneshot_mods(MOD_LSFT);
+            }
+            return false;
+        case KC_F21:
+            if (record->event.pressed) {
+                SEND_STRING("../");
+            }
+            return false;
+        case KC_F22:
+            if (record->event.pressed) {
+                SEND_STRING("->");
+            }
+            return false;
         case LT(0, KC_F15) ... LT(0, KC_F19):
             keycode          = keycode & 0xFF;
             uint8_t index    = keycode - KC_F15;
@@ -376,12 +399,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case LT(0, KC_F20):
             if (record->event.pressed) {
                 layer_move(record->tap.count ? (get_highest_layer(layer_state) % 2 + 1) : 4);
-            }
-            return false;
-        case KC_F21:
-            if (record->event.pressed) {
-                SEND_STRING(". ");
-                add_oneshot_mods(MOD_LSFT);
             }
             return false;
         case LT(0, KC_LNG1):
@@ -500,7 +517,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (!record->tap.count) {
                 layer_clear();
                 if (!record->event.pressed) {
-                    unregister_mods(MOD_MEH);
+                    if (is_layer4_enabled) {
+                        layer_on(4);
+                    }
                     if (morph_type) {
                         if (arrowkeys_registered) {
                             unregister_code(morph_code);
@@ -508,9 +527,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         }
                         morph_type = 0;
                     }
-                    if (is_layer4_enabled) {
-                        layer_on(4);
-                    }
+                    unregister_mods(MOD_MEH);
                 }
             }
         case KC_QUOT:
@@ -525,7 +542,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
-        send_report_user(keycode);
+        within_next_word(keycode);
     }
 }
 
