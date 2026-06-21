@@ -436,10 +436,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 switch (morph_type) {
                     case TAB_MORPH:
-                        if (keycode == KC_LEFT) {
-                            add_weak_mods(MOD_LSFT);
+                        switch (keycode) {
+                            case KC_LEFT: add_weak_mods(MOD_LSFT);
+                            default: morph_code = KC_TAB;
                         }
-                        morph_code = KC_TAB;
                         break;
                     case VOL_MORPH:
                         morph_code =
@@ -484,12 +484,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             break;
         case KC_COMM:
             static uint8_t registered_key;
-            uint8_t mod_state    = get_mods();
-            uint8_t oneshot_mods = get_oneshot_mods();
-
+            uint8_t mod_state = get_mods();
             if (record->event.pressed) {
                 registered_key = KC_COMM;
-                if ((mod_state | oneshot_mods) & MOD_MASK_SHIFT) {
+                if ((mod_state | get_oneshot_mods())
+                    & MOD_MASK_SHIFT) {
                     registered_key = KC_DOT;
                     del_mods(MOD_MASK_SHIFT);
                     del_oneshot_mods(MOD_MASK_SHIFT);
@@ -501,16 +500,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         case LT(4, KC_ENT):
-            static bool is_layer4_enabled = false;
-            if (!record->tap.count) {
-                is_layer4_enabled = record->event.pressed;
-            }
+            static bool ent_is_held;
+            ent_is_held = record->event.pressed;
             break;
         case LT(2, KC_SPC):
             if (!record->tap.count) {
                 layer_clear();
                 if (!record->event.pressed) {
-                    if (is_layer4_enabled) {
+                    if (ent_is_held) {
                         layer_on(4);
                     }
                     if (morph_type) {
