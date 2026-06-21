@@ -323,7 +323,7 @@ md	まで
 mt	また		DisplayAmbiguousResult
 mtrn	もちろん
 mn	もの
-ds	です
+ds	です		DisplayAmbiguousResult
 wt	わた
 wr	われ		DisplayAmbiguousResult
 ns	なし		DisplayAmbiguousResult
@@ -354,3 +354,4 @@ tr	ている
 dr	でいる
 dn	での
 ncrb	なければ
+dstg	でしたが

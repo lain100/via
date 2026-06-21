@@ -441,16 +441,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             default: morph_code = KC_TAB;
                         }
                         break;
-                    case VOL_MORPH:
-                        morph_code =
+                    case VOL_MORPH: morph_code =
                             keycode == KC_LEFT ? KC_VOLD : KC_VOLU;
                         break;
-                    case WWW_MORPH:
-                        morph_code =
+                    case WWW_MORPH: morph_code =
                             keycode == KC_LEFT ? KC_WBAK : KC_WFWD;
                         break;
-                    case CTRL_YZ_MORPH:
-                        morph_code =
+                    case CTRL_YZ_MORPH: morph_code =
                             keycode == KC_LEFT ? KC_Z    : KC_Y;
                         clear_mods();
                         add_weak_mods(MOD_LCTL);
@@ -462,9 +459,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                 clear_mods();
                                 add_weak_mods(MOD_LCTL);
                                 break;
-                            default:
-                                morph_code =
-                                    keycode == KC_UP ? KC_PGUP : KC_PGDN;
+                            default: morph_code =
+                                keycode == KC_UP ? KC_PGUP : KC_PGDN;
                         }
                         break;
                     case FOUR_MOVES_MORPH:
@@ -484,11 +480,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             break;
         case KC_COMM:
             static uint8_t registered_key;
-            uint8_t mod_state = get_mods();
             if (record->event.pressed) {
-                registered_key = KC_COMM;
-                if ((mod_state | get_oneshot_mods())
-                    & MOD_MASK_SHIFT) {
+                registered_key    = KC_COMM;
+                uint8_t mod_state = get_mods();
+                if ((mod_state | get_oneshot_mods()) & MOD_MASK_SHIFT) {
                     registered_key = KC_DOT;
                     del_mods(MOD_MASK_SHIFT);
                     del_oneshot_mods(MOD_MASK_SHIFT);

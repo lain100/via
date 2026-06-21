@@ -343,6 +343,7 @@ CryptStringToBinary(str) {
 Tips(msg, delay := 1000) => (ToolTip(msg) SetTimer(ToolTip, -delay))
 
 F15::(A_PriorKey == "F15" ? Reload() : ShowClipHistory())
+F17::Click
 ^Esc::Esc
 
 Tips("終わったよ", 800)
