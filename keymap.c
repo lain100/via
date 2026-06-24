@@ -81,6 +81,10 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_LAYER_TAP(keycode)
+        && ((keycode >> 8) & 0x0F) == 0) {
+        return TAPPING_TERM << 2;
+    }
+    if (IS_QK_LAYER_TAP(keycode)
         || IS_QK_ONE_SHOT_MOD(keycode)
         || IS_HOMEROW(keycode, *record, MOD_HYPR & ~MOD_LSFT)) {
         return TAPPING_TERM << 1;
@@ -240,6 +244,10 @@ void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    static bool layer4_is_held;
+    if (layer4_is_held && !IS_LAYER_ON(2)) {
+        layer_on(4);
+    }
     if (IS_QK_MOD_TAP(keycode)) {
         if (IS_LAYER_ON(2)) {
             uint8_t saved_mods = get_mods();
@@ -353,7 +361,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 KC_EDIT = 0;
                 if (record->tap.count) {
-                    if (timer_elapsed(timer[index]) > (QUICK_TAP_TERM << 3)) {
+                    if (timer_elapsed(timer[index]) > (QUICK_TAP_TERM << 2)) {
                         if (mod) {
                             if (get_mods() & mod) {
                                 unregister_mods(mod);
@@ -367,6 +375,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             morph_type  =
                                 keycode == KC_F15 ? CTRL_YZ_MORPH : TAB_MORPH;
                         }
+                        timer[index] = timer_read();
                     } else {
                         if (keycode == KC_F16) {
                             tap_code(KC_ESC);
@@ -397,7 +406,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     set_mods(saved_mods);
                     edit_registered = true;
                 }
-                timer[index] = timer_read();
             }
             return false;
         case LT(0, KC_F20):
@@ -498,17 +506,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 unregister_code(registered_key);
             }
             return false;
-        case LT(4, KC_ENT):
-            static bool ent_is_held;
-            ent_is_held = record->event.pressed;
-            break;
         case LT(2, KC_SPC):
             if (!record->tap.count) {
-                layer_clear();
                 if (!record->event.pressed) {
-                    if (ent_is_held) {
-                        layer_on(4);
-                    }
                     if (morph_type) {
                         if (arrowkeys_registered) {
                             unregister_code(morph_code);
@@ -518,9 +518,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     }
                     unregister_mods(MOD_MEH);
                 }
+                layer_clear();
             }
         case KC_QUOT:
             caps_word_off();
+            break;
+        case LT(4, KC_ENT):
+            if (!record->tap.count) {
+                layer4_is_held = record->event.pressed;
+            }
             break;
     }
     return true;
@@ -572,13 +578,13 @@ enum combos {
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E),               COMBO_END};
-const uint16_t PROGMEM cmb_osl1[]    = {KC_M,         KC_C,                       COMBO_END};
+const uint16_t PROGMEM cmb_osl1[]    = {LALT_T(KC_R), LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
 const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,                       COMBO_END};
 const uint16_t PROGMEM cmb_pscr[]    = {KC_L,         KC_D,         KC_W,         COMBO_END};
 const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,                       COMBO_END};
 const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,                       COMBO_END};
 const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,                       COMBO_END};
-const uint16_t PROGMEM cmb_os_ml3[]  = {LALT_T(KC_R), LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
+const uint16_t PROGMEM cmb_os_ml3[]  = {KC_M,         KC_C,                       COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn1[] = {LSFT_T(KC_T), LCTL_T(KC_S),               COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T),               COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S),               COMBO_END};

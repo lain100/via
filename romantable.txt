@@ -3,17 +3,17 @@ _	ー
 ~	〜
 .	。
 ,	、
-j/	・
-j.	…
-j,	‥
-jr	←
-jt	↓
-jd	↑
-js	→
-j-	〜
-j[	『		DisplayAmbiguousResult
-j]	』
-j[]	『』
+q/	・
+q.	…
+q,	‥
+qr	←
+qt	↓
+qd	↑
+qs	→
+q-	〜
+q[	『		DisplayAmbiguousResult
+q]	』
+q[]	『』
 [	「
 ]	」
 va	ゔぁ
@@ -26,7 +26,6 @@ vj	ゔぃ
 vy	ゔゅ
 vp	ゔぇ
 vf	ゔょ
-hh	f		DisplayAmbiguousResult
 l	っ
 c		k
 kx	きゃ
@@ -108,14 +107,14 @@ pj	ぴぃ
 py	ぴゅ
 pp	ぴぇ
 pf	ぴょ
-hha	ふぁ
-hhi	ふぃ
-hhe	ふぇ
-hhu	ふ
-hho	ふぉ
-hhx	ふゃ
-hhy	ふゅ
-hhf	ふょ
+pha	ふぁ
+phi	ふぃ
+phe	ふぇ
+phu	ふ
+pho	ふぉ
+phx	ふゃ
+phy	ふゅ
+phf	ふょ
 hwa	ふぁ
 hwi	ふぃ
 hwu	ふ
@@ -134,7 +133,7 @@ rj	りぃ
 ry	りゅ
 rp	りぇ
 rf	りょ
-jn	ん
+qn	ん
 '	ん
 a	あ
 i	い
@@ -142,20 +141,20 @@ u	う
 wu	う
 e	え
 o	お
-ja	ぁ
-ji	ぃ
-ju	ぅ
-je	ぇ
-jo	ぉ
-jj	ぃ
-jp	ぇ
+qa	ぁ
+qi	ぃ
+qu	ぅ
+qe	ぇ
+qo	ぉ
+qj	ぃ
+qp	ぇ
 ka	か
 ki	き
 ku	く
 ke	け
 ko	こ
-jca	ヵ
-jce	ヶ
+qca	ヵ
+qce	ヶ
 ga	が
 gi	ぎ
 gu	ぐ
@@ -166,11 +165,6 @@ si	し
 su	す
 se	せ
 so	そ
-qa	くぁ
-qi	くぃ
-qu	く
-qe	くぇ
-qo	くぉ
 kwa	くぁ
 kwi	くぃ
 kwu	くぅ
@@ -232,20 +226,20 @@ mi	み
 mu	む
 me	め
 mo	も
-jx	ゃ
+qx	ゃ
 x	や
 wj	ゐ
-jy	ゅ
+qy	ゅ
 y	ゆ
 wp	ゑ
-jf	ょ
+qf	ょ
 f	よ
 ra	ら
 ri	り
 ru	る
 re	れ
 ro	ろ
-jwa	ゎ
+qwa	ゎ
 wa	わ
 wi	うぃ
 we	うぇ
@@ -268,7 +262,7 @@ ss	させ		DisplayAmbiguousResult
 ssrr	させられ		DisplayAmbiguousResult
 ssrrr	させられる
 sstm	させても
-st	して
+st	して		DisplayAmbiguousResult
 str	している
 sn	しな		DisplayAmbiguousResult
 sncr	しなけれ		DisplayAmbiguousResult
@@ -294,13 +288,10 @@ ng	のが
 nn	のに
 dm	でも
 dc	でき
-dh	では		DisplayAmbiguousResult
-dhnc	ではなく
 dt	だと
 dg	だが
 gt	がち
 tm	ため
-th	とは		DisplayAmbiguousResult
 tc	てき
 td	ただ
 tb	たび
@@ -324,6 +315,7 @@ mt	また		DisplayAmbiguousResult
 mtrn	もちろん
 mn	もの
 ds	です		DisplayAmbiguousResult
+dstg	でしたが
 wt	わた
 wr	われ		DisplayAmbiguousResult
 ns	なし		DisplayAmbiguousResult
@@ -354,4 +346,3 @@ tr	ている
 dr	でいる
 dn	での
 ncrb	なければ
-dstg	でしたが
