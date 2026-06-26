@@ -318,36 +318,31 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         case KC_F14:
+        case KC_F20:
             if (record->event.pressed) {
-                SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200)
-                    "https://web.archive.org/web/" SS_LCTL("v") SS_TAP(X_ENTER));
+                SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200));
+                switch (keycode) {
+                    case KC_F14: SEND_STRING("https://web.archive.org/web/");
+                         break;
+                    default:     SEND_STRING("https://www.google.com/search?q=");
+                }
+                SEND_STRING(SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
         case KC_F15:
-            if (record->event.pressed) {
-                SEND_STRING("===");
-            }
-            return false;
         case KC_F18:
+        case KC_F21 ... KC_F22:
             if (record->event.pressed) {
-                SEND_STRING(". ");
-                add_oneshot_mods(MOD_LSFT);
-            }
-            return false;
-        case KC_F20:
-            if (record->event.pressed) {
-                SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200)
-                    "https://www.google.com/search?q=" SS_LCTL("v") SS_TAP(X_ENTER));
-            }
-            return false;
-        case KC_F21:
-            if (record->event.pressed) {
-                SEND_STRING("../");
-            }
-            return false;
-        case KC_F22:
-            if (record->event.pressed) {
-                SEND_STRING("->");
+                switch (keycode) {
+                    case KC_F15: SEND_STRING("===");
+                        break;
+                    case KC_F18: SEND_STRING(". ");
+                        add_oneshot_mods(MOD_LSFT);
+                        break;
+                    case KC_F21: SEND_STRING("../");
+                        break;
+                    default:     SEND_STRING("->");
+                }
             }
             return false;
         case LT(0, KC_F15) ... LT(0, KC_F19):
@@ -366,7 +361,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 editkey_registered = false;
             }
             if (record->event.pressed) {
-                KC_EDIT = 0;
                 if (record->tap.count) {
                     if (timer_elapsed(timer[index]) > (QUICK_TAP_TERM << 2)) {
                         if (mod) {
@@ -378,12 +372,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                     tap_code(KC_TAB);
                                 }
                             }
-                        } else {
-                            morph_type  =
-                                keycode == KC_F15 ? CTRL_YZ_MORPH : 0;
-                            KC_EDIT     =
-                                keycode == KC_F19 ? KC_V : 0;
+                        } else if (keycode == KC_F15) {
+                            morph_type = CTRL_YZ_MORPH;
                         }
+                        KC_EDIT     =
+                            keycode == KC_F19 ? KC_V : 0;
                         timer[index] = timer_read();
                     } else {
                         if (keycode == KC_F16) {
@@ -393,19 +386,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         morph_type  =
                             keycode == KC_F15 ? VOL_MORPH :
                             keycode == KC_F16 ? WWW_MORPH :
-                            keycode == KC_F17 ? 0 :
+                            keycode == KC_F17 ? TAB_MORPH :
                             keycode == KC_F18 ? CTRL_TAB_MORPH : 0;
                         KC_EDIT     =
-                            keycode == KC_F17 ? KC_X :
                             keycode == KC_F19 ? KC_V : 0;
                     }
                 } else {
                     tap_code(keycode == KC_F17 ? KC_F15 :
                              keycode == KC_F18 ? KC_F16 : 0);
                     morph_type  =
-                        keycode == KC_F15 ? MOVES_X4_MORPH :
-                        keycode == KC_F16 ? TAB_MORPH : 0;
+                        keycode == KC_F15 ? MOVES_X4_MORPH : 0;
                     KC_EDIT     =
+                        keycode == KC_F16 ? KC_X :
                         keycode == KC_F19 ? KC_C : 0;
                 }
                 if (KC_EDIT) {
@@ -552,21 +544,22 @@ void matrix_scan_user(void) {
     static uint16_t repeat_timer = 0;
     if (navkey_registered
         && morph_type == MOVES_X4_MORPH) {
-        if (repeat_timer) {
-            if (timer_elapsed(repeat_timer)
-                    > (first_iteration ? REPEAT_DELAY : REPEAT_INTERVAL)) {
-                send_four_times(morph_code);
-                first_iteration = false;
-                repeat_timer = timer_read();
-            } else return;
+        if (repeat_timer == 0) {
+            repeat_timer = timer_read();
+        } else if (timer_elapsed(repeat_timer)
+                > (first_iteration ? REPEAT_DELAY : REPEAT_INTERVAL)) {
+            send_four_times(morph_code);
+            first_iteration = false;
+            repeat_timer = timer_read();
         }
-        repeat_timer = timer_read();
     } else {
         repeat_timer = 0;
     }
 }
 
 enum combos {
+    CMB_J,
+    CMB_K,
     CMB_APP,
     CMB_LNG1,
     CMB_LNG2,
@@ -576,12 +569,14 @@ enum combos {
     CMB_OS_CTL,
     CMB_OS_SFT,
     CMB_OS_ALT,
-    CMB_OS_ML3,
+    CMB_OS_MOL3,
     CMB_MS_BTN1,
     CMB_MS_BTN2,
     CMB_MS_BTN3,
 };
 
+const uint16_t PROGMEM cmb_j[]       = {LT(0, KC_F16), LT(0, KC_F17),             COMBO_END};
+const uint16_t PROGMEM cmb_k[]       = {LT(0, KC_F17), LT(0, KC_F18),             COMBO_END};
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E),               COMBO_END};
@@ -591,12 +586,14 @@ const uint16_t PROGMEM cmb_pscr[]    = {KC_L,         KC_D,         KC_W,       
 const uint16_t PROGMEM cmb_os_ctl[]  = {KC_D,         KC_W,                       COMBO_END};
 const uint16_t PROGMEM cmb_os_sft[]  = {KC_L,         KC_W,                       COMBO_END};
 const uint16_t PROGMEM cmb_os_alt[]  = {KC_L,         KC_D,                       COMBO_END};
-const uint16_t PROGMEM cmb_os_ml3[]  = {KC_M,         KC_C,                       COMBO_END};
+const uint16_t PROGMEM cmb_os_mol3[] = {KC_M,         KC_C,                       COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn1[] = {LSFT_T(KC_T), LCTL_T(KC_S),               COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T),               COMBO_END};
 const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S),               COMBO_END};
 
 combo_t key_combos[] = {
+    [CMB_J]          = COMBO(cmb_j,         KC_J),
+    [CMB_K]          = COMBO(cmb_k,         KC_K),
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
@@ -606,7 +603,7 @@ combo_t key_combos[] = {
     [CMB_OS_CTL]     = COMBO(cmb_os_ctl,    OSM(MOD_LCTL)),
     [CMB_OS_SFT]     = COMBO(cmb_os_sft,    OSM(MOD_LSFT)),
     [CMB_OS_ALT]     = COMBO(cmb_os_alt,    OSM(MOD_LALT)),
-    [CMB_OS_ML3]     = COMBO(cmb_os_ml3,    LT(3, KC_NO)),
+    [CMB_OS_MOL3]    = COMBO(cmb_os_mol3,   LT(3, KC_NO)),
     [CMB_MS_BTN1]    = COMBO(cmb_ms_btn1,   KC_MS_BTN1),
     [CMB_MS_BTN2]    = COMBO(cmb_ms_btn2,   KC_MS_BTN2),
     [CMB_MS_BTN3]    = COMBO(cmb_ms_btn3,   KC_MS_BTN3),
