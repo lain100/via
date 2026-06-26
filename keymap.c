@@ -80,7 +80,8 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
-    if (IS_QK_LAYER_TAP(keycode)
+    if (IS_LAYER_ON(2)
+        && IS_QK_LAYER_TAP(keycode)
         && ((keycode >> 8) & 0x0F) == 0) {
         return TAPPING_TERM << 2;
     }
@@ -122,21 +123,21 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-enum arrowkeys_types {
+enum navkey_types {
     TAB_MORPH = 1,
     VOL_MORPH,
     WWW_MORPH,
     CTRL_YZ_MORPH,
     CTRL_TAB_MORPH,
-    FOUR_MOVES_MORPH,
+    MOVES_X4_MORPH,
 };
 
-uint16_t morph_type       = 0;
-uint16_t morph_code       = 0;
-bool first_iteration      = false;
-bool arrowkeys_registered = false;
+uint16_t morph_type    = 0;
+uint16_t morph_code    = 0;
+bool first_iteration   = false;
+bool navkey_registered = false;
 
-void four_moves(uint16_t keycode) {
+void send_four_times(uint16_t keycode) {
     for (uint8_t i = 0; i < 4; i++) {
         tap_code(keycode);
     }
@@ -149,9 +150,9 @@ typedef struct {
     uint8_t  front;
     uint8_t  rear;
     uint8_t  count;
-} mt_cycle_t;
+} mt_queue_t;
 
-bool enqueue(mt_cycle_t *buf, uint16_t data) {
+bool enqueue(mt_queue_t *buf, uint16_t data) {
     if (buf->count >= BUFFER_SIZE) {
         return false;
     }
@@ -161,7 +162,7 @@ bool enqueue(mt_cycle_t *buf, uint16_t data) {
     return true;
 }
 
-bool dequeue(mt_cycle_t *buf, uint16_t *data) {
+bool dequeue(mt_queue_t *buf, uint16_t *data) {
     if (buf->count <= 0) {
         return false;
     }
@@ -171,10 +172,10 @@ bool dequeue(mt_cycle_t *buf, uint16_t *data) {
     return true;
 }
 
-mt_cycle_t lmts = {{0}, 0, 0, 0};
-mt_cycle_t rmts = {{0}, 0, 0, 0};
+mt_queue_t lmts = {{0}, 0, 0, 0};
+mt_queue_t rmts = {{0}, 0, 0, 0};
 
-void mts_hold_on(mt_cycle_t *mts) {
+void enable_mts_mods(mt_queue_t *mts) {
     uint16_t poped_key;
     uint8_t  pended_mods = 0;
     while (dequeue(mts, &poped_key)) {
@@ -184,12 +185,12 @@ void mts_hold_on(mt_cycle_t *mts) {
     register_mods(pended_mods);
 }
 
-void mts_hold_on_all(void) {
-     mts_hold_on(&lmts);
-     mts_hold_on(&rmts);
+void enable_all_mts_mods(void) {
+     enable_mts_mods(&lmts);
+     enable_mts_mods(&rmts);
 }
 
-void within_next_word(uint16_t keycode) {
+void within_word(uint16_t keycode) {
     static const uint16_t brcts[][2] = {
         { S(KC_QUOT), S(KC_QUOT) },
         { S(KC_LBRC), S(KC_RBRC) },
@@ -226,18 +227,18 @@ void within_next_word(uint16_t keycode) {
 }
 
 void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
-    mt_cycle_t *same  = record.event.key.row == 1 ? &lmts : &rmts;
-    mt_cycle_t *other = record.event.key.row == 5 ? &lmts : &rmts;
+    mt_queue_t *same_hand  = record.event.key.row == 1 ? &lmts : &rmts;
+    mt_queue_t *other_hand = record.event.key.row == 5 ? &lmts : &rmts;
     uint16_t poped_key;
 
-    mts_hold_on(other);
-    while (dequeue(same, &poped_key)) {
+    enable_mts_mods(other_hand);
+    while (dequeue(same_hand, &poped_key)) {
         if (is_caps_word_on()) {
             add_weak_mods(MOD_LSFT);
         }
         tap_code(QK_MOD_TAP_GET_TAP_KEYCODE(poped_key));
-        within_next_word(poped_key);
-        if (keycode == poped_key) {
+        within_word(poped_key);
+        if (poped_key == keycode) {
             return;
         }
     }
@@ -274,7 +275,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_MS_BTN1 ... KC_MS_BTN3:
             if (record->event.pressed
                 && (lmts.count || rmts.count)) {
-                mts_hold_on_all();
+                enable_all_mts_mods();
                 report_mouse_t mouse_report = pointing_device_get_report();
                 mouse_report.buttons |= MOUSE_BTN1 << (keycode - KC_MS_BTN1);
                 pointing_device_set_report(mouse_report);
@@ -283,7 +284,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return true;
     }
 
-    mts_hold_on_all();
+    enable_all_mts_mods();
     if (keycode != LT(3, KC_NO)
         && !record->event.pressed) {
         clear_oneshot_layer_state(ONESHOT_PRESSED);
@@ -319,7 +320,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case KC_F14:
             if (record->event.pressed) {
                 SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200)
-                        "https://web.archive.org/web/" SS_LCTL("v") SS_TAP(X_ENTER));
+                    "https://web.archive.org/web/" SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
         case KC_F15:
@@ -331,6 +332,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 SEND_STRING(". ");
                 add_oneshot_mods(MOD_LSFT);
+            }
+            return false;
+        case KC_F20:
+            if (record->event.pressed) {
+                SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200)
+                    "https://www.google.com/search?q=" SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
         case KC_F21:
@@ -350,13 +357,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     keycode == KC_F16 ? MOD_LALT :
                     keycode == KC_F17 ? MOD_LSFT :
                     keycode == KC_F18 ? MOD_LCTL : 0;
-            static uint16_t timer[5]    = {0};
-            static uint8_t  KC_EDIT     = 0;
-            static bool edit_registered = false;
+            static uint16_t timer[5]       = {0};
+            static uint8_t  KC_EDIT        = 0;
+            static bool editkey_registered = false;
 
-            if (edit_registered) {
+            if (editkey_registered) {
                 unregister_code(KC_EDIT);
-                edit_registered = false;
+                editkey_registered = false;
             }
             if (record->event.pressed) {
                 KC_EDIT = 0;
@@ -373,7 +380,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             }
                         } else {
                             morph_type  =
-                                keycode == KC_F15 ? CTRL_YZ_MORPH : TAB_MORPH;
+                                keycode == KC_F15 ? CTRL_YZ_MORPH : 0;
+                            KC_EDIT     =
+                                keycode == KC_F19 ? KC_V : 0;
                         }
                         timer[index] = timer_read();
                     } else {
@@ -381,22 +390,23 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                             tap_code(KC_ESC);
                         }
                         unregister_mods(mod);
-                        KC_EDIT     =
-                            keycode == KC_F17 ? KC_V : 0;
                         morph_type  =
-                            keycode == KC_F15 ? CTRL_YZ_MORPH :
+                            keycode == KC_F15 ? VOL_MORPH :
                             keycode == KC_F16 ? WWW_MORPH :
                             keycode == KC_F17 ? 0 :
-                            keycode == KC_F18 ? CTRL_TAB_MORPH : VOL_MORPH;
+                            keycode == KC_F18 ? CTRL_TAB_MORPH : 0;
+                        KC_EDIT     =
+                            keycode == KC_F17 ? KC_X :
+                            keycode == KC_F19 ? KC_V : 0;
                     }
                 } else {
                     tap_code(keycode == KC_F17 ? KC_F15 :
                              keycode == KC_F18 ? KC_F16 : 0);
-                    KC_EDIT     =
-                        keycode == KC_F16 ? KC_C :
-                        keycode == KC_F19 ? KC_X : 0;
                     morph_type  =
-                        keycode == KC_F15 ? FOUR_MOVES_MORPH : 0;
+                        keycode == KC_F15 ? MOVES_X4_MORPH :
+                        keycode == KC_F16 ? TAB_MORPH : 0;
+                    KC_EDIT     =
+                        keycode == KC_F19 ? KC_C : 0;
                 }
                 if (KC_EDIT) {
                     uint8_t saved_mods = get_mods();
@@ -404,7 +414,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     add_weak_mods(MOD_LCTL);
                     register_code(KC_EDIT);
                     set_mods(saved_mods);
-                    edit_registered = true;
+                    editkey_registered = true;
                 }
             }
             return false;
@@ -424,13 +434,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
             }
             return false;
-        case KC_UP:
-        case KC_DOWN:
-        case KC_LEFT:
-        case KC_RGHT:
-            if (arrowkeys_registered) {
+        case KC_RGHT ... KC_LEFT:
+        case KC_DOWN ... KC_UP:
+            if (navkey_registered) {
                 unregister_code(morph_code);
-                arrowkeys_registered = false;
+                navkey_registered = false;
                 if (!record->event.pressed) {
                     return false;
                 }
@@ -439,8 +447,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 uint8_t saved_mods = get_mods();
 
                 switch (keycode) {
-                    case KC_UP:
-                    case KC_DOWN:
+                    case KC_DOWN ... KC_UP:
                         switch (morph_type) {
                             case TAB_MORPH ... CTRL_YZ_MORPH:
                                 return true;
@@ -475,18 +482,18 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                 keycode == KC_UP ? KC_PGUP : KC_PGDN;
                         }
                         break;
-                    case FOUR_MOVES_MORPH:
-                        four_moves(keycode);
+                    case MOVES_X4_MORPH:
+                        send_four_times(keycode);
                         morph_code = keycode;
                         first_iteration = true;
-                        arrowkeys_registered = true;
+                        navkey_registered = true;
                         return false;
                     default:
                         return true;
                 }
                 register_code(morph_code);
                 set_mods(saved_mods);
-                arrowkeys_registered = true;
+                navkey_registered = true;
                 return false;
             }
             break;
@@ -510,9 +517,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             if (!record->tap.count) {
                 if (!record->event.pressed) {
                     if (morph_type) {
-                        if (arrowkeys_registered) {
+                        if (navkey_registered) {
                             unregister_code(morph_code);
-                            arrowkeys_registered = false;
+                            navkey_registered = false;
                         }
                         morph_type = 0;
                     }
@@ -534,7 +541,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
-        within_next_word(keycode);
+        within_word(keycode);
     }
 }
 
@@ -543,17 +550,17 @@ void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 void matrix_scan_user(void) {
     static uint16_t repeat_timer = 0;
-
-    if (morph_type == FOUR_MOVES_MORPH
-        && arrowkeys_registered) {
-        if (repeat_timer == 0) {
-            repeat_timer = timer_read();
-        } else if (timer_elapsed(repeat_timer)
-                > (first_iteration ? REPEAT_DELAY : REPEAT_INTERVAL)) {
-            four_moves(morph_code);
-            first_iteration = false;
-            repeat_timer = timer_read();
+    if (navkey_registered
+        && morph_type == MOVES_X4_MORPH) {
+        if (repeat_timer) {
+            if (timer_elapsed(repeat_timer)
+                    > (first_iteration ? REPEAT_DELAY : REPEAT_INTERVAL)) {
+                send_four_times(morph_code);
+                first_iteration = false;
+                repeat_timer = timer_read();
+            } else return;
         }
+        repeat_timer = timer_read();
     } else {
         repeat_timer = 0;
     }
@@ -638,8 +645,8 @@ uint8_t combo_ref_from_layer(uint8_t layer) {
 
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
     clear_weak_mods();
-    if (abs(mouse_report.x) + abs(mouse_report.y)) {
-        mts_hold_on_all();
+    if (abs(mouse_report.x) || abs(mouse_report.y)) {
+        enable_all_mts_mods();
     }
     return mouse_report;
 }
