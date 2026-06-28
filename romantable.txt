@@ -11,9 +11,9 @@ qt	↓
 qd	↑
 qs	→
 q-	〜
-q[	『		DisplayAmbiguousResult
+q[	『
 q]	』
-q[]	『』
+'	『』
 [	「
 ]	」
 va	ゔぁ
@@ -190,6 +190,16 @@ zi	じ
 zu	ず
 ze	ぜ
 zo	ぞ
+ja	じゃ
+ji	じ
+ju	じゅ
+je	じぇ
+jo	じょ
+j;	じゃ
+j'	じぃ
+jy	じゅ
+jj	じぇ
+jf	じょ
 ta	た
 ti	ち
 tu	つ
@@ -341,7 +351,6 @@ rsrrr	らせられる
 rn	らな		DisplayAmbiguousResult
 rncr	らなけれ
 bc	べき
-"	ン
 tr	ている
 dr	でいる
 dn	での
