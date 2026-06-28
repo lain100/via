@@ -205,10 +205,6 @@ void within_word(uint16_t keycode) {
     static uint8_t  reception_id = null_id;
     keycode = keycode & 0xFF;
 
-    if (!get_highest_layer(layer_state)) {
-        reception_id = null_id;
-        return;
-    }
     if (is_caps_word_on()
         || get_weak_mods() == MOD_LSFT) {
         keycode |= MOD_LSFT << 8;
@@ -318,7 +314,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         case KC_F14:
-        case KC_F20:
+        case KC_F21:
             if (record->event.pressed) {
                 SEND_STRING(SS_LCTL("c") SS_LGUI("r") SS_DELAY(200));
                 switch (keycode) {
@@ -329,31 +325,31 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 SEND_STRING(SS_LCTL("v") SS_TAP(X_ENTER));
             }
             return false;
-        case KC_F15:
-        case KC_F18:
-        case KC_F21 ... KC_F22:
+        case KC_F15 ... KC_F16:
+        case KC_F18 ... KC_F20:
             if (record->event.pressed) {
                 switch (keycode) {
                     case KC_F15: SEND_STRING("===");
                         break;
+                    case KC_F16: SEND_STRING("=>");
+                        break;
                     case KC_F18: SEND_STRING(". ");
                         add_oneshot_mods(MOD_LSFT);
                         break;
-                    case KC_F21: SEND_STRING("../");
+                    case KC_F19: SEND_STRING("->");
                         break;
-                    default:     SEND_STRING("->");
+                    default:     SEND_STRING("../");
                 }
             }
             return false;
-        case LT(0, KC_F15) ... LT(0, KC_F19):
-            keycode          = keycode & 0xFF;
-            uint8_t index    = keycode - KC_F15;
-            uint8_t mod      =
-                    keycode == KC_F16 ? MOD_LALT :
-                    keycode == KC_F17 ? MOD_LSFT :
-                    keycode == KC_F18 ? MOD_LCTL : 0;
-            static uint16_t timer[5]       = {0};
+        case LT(0, KC_F1) ... LT(0, KC_F5):
+            uint8_t index = (keycode & 0xFF) - KC_F1;
+            uint8_t mod   =
+                   index == 1 ? MOD_LALT :
+                   index == 2 ? MOD_LSFT :
+                   index == 3 ? MOD_LCTL : 0;
             static uint8_t  KC_EDIT        = 0;
+            static uint16_t timer[5]       = {0};
             static bool editkey_registered = false;
 
             if (editkey_registered) {
@@ -368,37 +364,37 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                                 unregister_mods(mod);
                             } else {
                                 register_mods(mod);
-                                if (keycode == KC_F16) {
+                                if (index == 1) {
                                     tap_code(KC_TAB);
                                 }
                             }
-                        } else if (keycode == KC_F15) {
+                        } else if (index == 0) {
                             morph_type = CTRL_YZ_MORPH;
                         }
-                        KC_EDIT     =
-                            keycode == KC_F19 ? KC_V : 0;
+                        KC_EDIT =
+                            index == 4 ? KC_V : 0;
                         timer[index] = timer_read();
                     } else {
-                        if (keycode == KC_F16) {
+                        if (index == 1) {
                             tap_code(KC_ESC);
                         }
                         unregister_mods(mod);
-                        morph_type  =
-                            keycode == KC_F15 ? VOL_MORPH :
-                            keycode == KC_F16 ? WWW_MORPH :
-                            keycode == KC_F17 ? TAB_MORPH :
-                            keycode == KC_F18 ? CTRL_TAB_MORPH : 0;
-                        KC_EDIT     =
-                            keycode == KC_F19 ? KC_V : 0;
+                        morph_type =
+                            index == 0 ? VOL_MORPH :
+                            index == 1 ? WWW_MORPH :
+                            index == 2 ? TAB_MORPH :
+                            index == 3 ? CTRL_TAB_MORPH : 0;
+                        KC_EDIT =
+                            index == 4 ? KC_V : 0;
                     }
                 } else {
-                    tap_code(keycode == KC_F17 ? KC_F15 :
-                             keycode == KC_F18 ? KC_F16 : 0);
-                    morph_type  =
-                        keycode == KC_F15 ? MOVES_X4_MORPH : 0;
-                    KC_EDIT     =
-                        keycode == KC_F16 ? KC_X :
-                        keycode == KC_F19 ? KC_C : 0;
+                    tap_code(index == 2 ? KC_F15 :
+                             index == 3 ? KC_F16 : 0);
+                    morph_type =
+                        index == 0 ? MOVES_X4_MORPH : 0;
+                    KC_EDIT =
+                        index == 1 ? KC_X :
+                        index == 4 ? KC_C : 0;
                 }
                 if (KC_EDIT) {
                     uint8_t saved_mods = get_mods();
@@ -410,7 +406,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
             }
             return false;
-        case LT(0, KC_F20):
+        case LT(0, KC_L):
             if (record->event.pressed) {
                 layer_move(record->tap.count ? (get_highest_layer(layer_state) % 2 + 1) : 4);
             }
@@ -575,11 +571,11 @@ enum combos {
     CMB_MS_BTN3,
 };
 
-const uint16_t PROGMEM cmb_j[]       = {LT(0, KC_F16), LT(0, KC_F17),             COMBO_END};
-const uint16_t PROGMEM cmb_k[]       = {LT(0, KC_F17), LT(0, KC_F18),             COMBO_END};
+const uint16_t PROGMEM cmb_j[]       = {LT(0, KC_F2), LT(0, KC_F3),               COMBO_END};
+const uint16_t PROGMEM cmb_k[]       = {LT(0, KC_F3), LT(0, KC_F4),               COMBO_END};
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,                       COMBO_END};
-const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_E),               COMBO_END};
+const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_H),               COMBO_END};
 const uint16_t PROGMEM cmb_osl1[]    = {LALT_T(KC_R), LSFT_T(KC_T), LCTL_T(KC_S), COMBO_END};
 const uint16_t PROGMEM cmb_int4[]    = {KC_Z,         KC_C,                       COMBO_END};
 const uint16_t PROGMEM cmb_pscr[]    = {KC_L,         KC_D,         KC_W,         COMBO_END};
@@ -612,7 +608,6 @@ combo_t key_combos[] = {
 bool caps_word_press_user(uint16_t keycode) {
     switch (keycode) {
         case KC_A ... KC_Z:
-        case KC_QUOT:
         case KC_MINS:
             add_weak_mods(MOD_LSFT);
             return true;
@@ -623,6 +618,7 @@ bool caps_word_press_user(uint16_t keycode) {
         case KC_EQL:
         case KC_DEL:
         case KC_BSPC:
+        case KC_QUOT:
         case KC_SLSH:
             return true;
     }
