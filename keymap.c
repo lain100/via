@@ -515,7 +515,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 layer_clear();
             }
-        case KC_QUOT:
             caps_word_off();
             break;
         case LT(4, KC_ENT):
