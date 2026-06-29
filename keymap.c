@@ -70,8 +70,6 @@ bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     } else {
         tap_bit_t tap = TAP_BIT_FROM_KEYCODE(keycode);
         if (pressed_keys[tap.index] & tap.bitmask) {
-            uint8_t mod = (keycode >> 8) & 0x1F;
-            unregister_mods(mod & 0x10 ? (mod << 4) : mod);
             pressed_keys[tap.index] &= ~tap.bitmask;
             record->tap.count++;
         }
@@ -143,6 +141,38 @@ void send_four_times(uint16_t keycode) {
     }
 }
 
+void within_word(uint16_t keycode) {
+    static const uint16_t brcts[][2] = {
+        { S(KC_QUOT), S(KC_QUOT) },
+        { S(KC_LBRC), S(KC_RBRC) },
+        { S(KC_COMM), S(KC_DOT)  },
+        { S(KC_9),    S(KC_0)    },
+        { KC_QUOT,    KC_QUOT    },
+        { KC_LBRC,    KC_RBRC    },
+        { KC_GRV,     KC_GRV     },
+        { 0,          -1         },
+    };
+    static const uint8_t null_id = ARRAY_SIZE(brcts) - 1;
+    static uint8_t  reception_id = null_id;
+    keycode = keycode & 0xFF;
+
+    if (is_caps_word_on()
+        || get_weak_mods() == MOD_LSFT) {
+        keycode |= MOD_LSFT << 8;
+    }
+    clear_weak_mods();
+    if (keycode == brcts[reception_id][1]) {
+        tap_code(KC_LEFT);
+        reception_id = null_id;
+        return;
+    }
+    for (reception_id = 0; reception_id < null_id; reception_id++) {
+        if (keycode == brcts[reception_id][0]) {
+            return;
+        }
+    }
+}
+
 #define BUFFER_SIZE 16
 
 typedef struct {
@@ -190,45 +220,9 @@ void enable_all_mts_mods(void) {
      enable_mts_mods(&rmts);
 }
 
-void within_word(uint16_t keycode) {
-    static const uint16_t brcts[][2] = {
-        { S(KC_QUOT), S(KC_QUOT) },
-        { S(KC_LBRC), S(KC_RBRC) },
-        { S(KC_COMM), S(KC_DOT)  },
-        { S(KC_9),    S(KC_0)    },
-        { KC_QUOT,    KC_QUOT    },
-        { KC_LBRC,    KC_RBRC    },
-        { KC_GRV,     KC_GRV     },
-        { 0,          -1         },
-    };
-    static const uint8_t null_id = ARRAY_SIZE(brcts) - 1;
-    static uint8_t  reception_id = null_id;
-    keycode = keycode & 0xFF;
-
-    if (is_caps_word_on()
-        || get_weak_mods() == MOD_LSFT) {
-        keycode |= MOD_LSFT << 8;
-    }
-    clear_weak_mods();
-    if (keycode == brcts[reception_id][1]) {
-        tap_code(KC_LEFT);
-        reception_id = null_id;
-        return;
-    }
-    for (reception_id = 0; reception_id < null_id; reception_id++) {
-        if (keycode == brcts[reception_id][0]) {
-            return;
-        }
-    }
-}
-
-void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
-    mt_queue_t *same_hand  = record.event.key.row == 1 ? &lmts : &rmts;
-    mt_queue_t *other_hand = record.event.key.row == 5 ? &lmts : &rmts;
+void send_mts_taps(mt_queue_t *mts, uint16_t keycode) {
     uint16_t poped_key;
-
-    enable_mts_mods(other_hand);
-    while (dequeue(same_hand, &poped_key)) {
+    while (dequeue(mts, &poped_key)) {
         if (is_caps_word_on()) {
             add_weak_mods(MOD_LSFT);
         }
@@ -240,11 +234,20 @@ void procoss_pended_keys(uint16_t keycode, keyrecord_t record) {
     }
 }
 
+void procoss_pended_keys(uint16_t keycode, keyrecord_t record, const uint8_t mask) {
+    uint8_t row            = record.event.key.row;
+    mt_queue_t *same_hand  = mask        & (1U << row) ? &lmts : &rmts;
+    mt_queue_t *other_hand = (mask << 4) & (1U << row) ? &lmts : &rmts;
+    enable_mts_mods(other_hand);
+    send_mts_taps(same_hand, keycode);
+}
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     static bool layer4_is_held;
     if (layer4_is_held && !IS_LAYER_ON(2)) {
         layer_on(4);
     }
+
     if (IS_QK_MOD_TAP(keycode)) {
         if (IS_LAYER_ON(2)) {
             uint8_t saved_mods = get_mods();
@@ -253,7 +256,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
         if (record->event.pressed) {
             if (record->tap.count) {
-                procoss_pended_keys(keycode, *record);
+                procoss_pended_keys(keycode, *record, 0x02);
             } else {
                 enqueue(record->event.key.row == 1 ? &lmts : &rmts, keycode);
                 return false;
@@ -261,10 +264,14 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         } else if (!record->tap.count) {
             uint8_t mod = (keycode >> 8) & 0x1F;
             unregister_mods(mod & 0x10 ? (mod << 4) : mod);
-            procoss_pended_keys(keycode, *record);
+            procoss_pended_keys(keycode, *record, 0x02);
             return false;
         }
         return true;
+    }
+
+    if (0x55 & (1U << record->event.key.row)) {
+        procoss_pended_keys(keycode, *record, 0x05);
     }
 
     switch (keycode) {
@@ -281,6 +288,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     enable_all_mts_mods();
+
     if (keycode != LT(3, KC_NO)
         && !record->event.pressed) {
         clear_oneshot_layer_state(ONESHOT_PRESSED);
@@ -553,8 +561,6 @@ void matrix_scan_user(void) {
 }
 
 enum combos {
-    CMB_J,
-    CMB_K,
     CMB_APP,
     CMB_LNG1,
     CMB_LNG2,
@@ -570,8 +576,6 @@ enum combos {
     CMB_MS_BTN3,
 };
 
-const uint16_t PROGMEM cmb_j[]       = {LT(0, KC_F2), LT(0, KC_F3),               COMBO_END};
-const uint16_t PROGMEM cmb_k[]       = {LT(0, KC_F3), LT(0, KC_F4),               COMBO_END};
 const uint16_t PROGMEM cmb_app[]     = {KC_Z,         KC_M,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng1[]    = {LCTL_T(KC_S), KC_G,                       COMBO_END};
 const uint16_t PROGMEM cmb_lng2[]    = {KC_Y,         RCTL_T(KC_H),               COMBO_END};
@@ -587,8 +591,6 @@ const uint16_t PROGMEM cmb_ms_btn2[] = {LALT_T(KC_R), LSFT_T(KC_T),             
 const uint16_t PROGMEM cmb_ms_btn3[] = {LALT_T(KC_R), LCTL_T(KC_S),               COMBO_END};
 
 combo_t key_combos[] = {
-    [CMB_J]          = COMBO(cmb_j,         KC_J),
-    [CMB_K]          = COMBO(cmb_k,         KC_K),
     [CMB_APP]        = COMBO(cmb_app,       LT(0, KC_APP)),
     [CMB_LNG1]       = COMBO(cmb_lng1,      LT(0, KC_LNG1)),
     [CMB_LNG2]       = COMBO(cmb_lng2,      LT(0, KC_LNG2)),
