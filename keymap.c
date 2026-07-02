@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <stdint.h>
 #include QMK_KEYBOARD_H
 
 #include "quantum.h"
@@ -292,7 +293,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return true;
         default:
-            if (record->event.pressed) {
+            if (!record->event.pressed) {
                 clear_oneshot_layer_state(ONESHOT_PRESSED);
             }
     }
@@ -361,8 +362,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                    index == 1 ? MOD_LALT :
                    index == 2 ? MOD_LSFT :
                    index == 3 ? MOD_LCTL : 0;
-            static uint8_t  KC_EDIT        = 0;
-            static uint16_t timer[5]       = {0};
+            static uint8_t permanent_mods;
+            static uint8_t  KC_EDIT;
+            static uint16_t timer[5] = {0};
             static bool editkey_registered = false;
 
             if (editkey_registered) {
@@ -373,13 +375,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 if (record->tap.count) {
                     if (timer_elapsed(timer[index]) > (QUICK_TAP_TERM << 2)) {
                         if (mod) {
-                            if (get_mods() & mod) {
-                                unregister_mods(mod);
-                            } else {
-                                register_mods(mod);
-                                if (index == 1) {
-                                    tap_code(KC_TAB);
-                                }
+                            permanent_mods = get_mods() ^ mod;
+                            set_mods(permanent_mods);
+                            if (index == 1) {
+                                tap_code(KC_TAB);
                             }
                         } else if (index == 0) {
                             morph_type = CTRL_YZ_MORPH;
@@ -524,7 +523,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                         }
                         morph_type = 0;
                     }
-                    unregister_mods(MOD_MEH);
+                    unregister_mods(permanent_mods);
+                    permanent_mods = 0;
                 }
                 layer_clear();
             }
