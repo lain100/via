@@ -121,6 +121,12 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
+enum custom_keycodes {
+    KC_MY_BTN1 = 1,
+    KC_MY_BTN2,
+    KC_MY_BTN3,
+};
+
 enum navkey_types {
     TAB_MORPH = 1,
     VOL_MORPH,
@@ -274,25 +280,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         procoss_pended_keys(keycode, *record, 0x05);
     }
 
-    switch (keycode) {
-        case KC_MS_BTN1 ... KC_MS_BTN3:
-            if (record->event.pressed
-                && (lmts.count || rmts.count)) {
-                enable_all_mts_mods();
-                report_mouse_t mouse_report = pointing_device_get_report();
-                mouse_report.buttons |= MOUSE_BTN1 << (keycode - KC_MS_BTN1);
-                pointing_device_set_report(mouse_report);
-                return false;
-            }
-            return true;
-    }
-
     enable_all_mts_mods();
-
-    if (keycode != LT(3, KC_NO)
-        && !record->event.pressed) {
-        clear_oneshot_layer_state(ONESHOT_PRESSED);
-    }
 
     switch (keycode) {
         case LT(3, KC_NO):
@@ -302,7 +290,24 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                 }
                 return false;
             }
-            break;
+            return true;
+        default:
+            if (record->event.pressed) {
+                clear_oneshot_layer_state(ONESHOT_PRESSED);
+            }
+    }
+
+    switch (keycode) {
+        case KC_MY_BTN1 ... KC_MY_BTN3:
+            report_mouse_t mouse_report = pointing_device_get_report();
+            uint8_t btn = MOUSE_BTN1 << (keycode - KC_MY_BTN1);
+            if (record->event.pressed) {
+                mouse_report.buttons |= btn;
+            } else {
+                mouse_report.buttons &= ~btn;
+            }
+            pointing_device_set_report(mouse_report);
+            return false;
         case LT(0, KC_APP):
             if (!record->tap.count) {
                 if (record->event.pressed) {
@@ -601,9 +606,9 @@ combo_t key_combos[] = {
     [CMB_OS_SFT]     = COMBO(cmb_os_sft,    OSM(MOD_LSFT)),
     [CMB_OS_ALT]     = COMBO(cmb_os_alt,    OSM(MOD_LALT)),
     [CMB_OS_MOL3]    = COMBO(cmb_os_mol3,   LT(3, KC_NO)),
-    [CMB_MS_BTN1]    = COMBO(cmb_ms_btn1,   KC_MS_BTN1),
-    [CMB_MS_BTN2]    = COMBO(cmb_ms_btn2,   KC_MS_BTN2),
-    [CMB_MS_BTN3]    = COMBO(cmb_ms_btn3,   KC_MS_BTN3),
+    [CMB_MS_BTN1]    = COMBO(cmb_ms_btn1,   KC_MY_BTN1),
+    [CMB_MS_BTN2]    = COMBO(cmb_ms_btn2,   KC_MY_BTN2),
+    [CMB_MS_BTN3]    = COMBO(cmb_ms_btn3,   KC_MY_BTN3),
 };
 
 bool caps_word_press_user(uint16_t keycode) {
